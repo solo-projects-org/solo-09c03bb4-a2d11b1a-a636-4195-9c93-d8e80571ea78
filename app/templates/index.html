@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>概览</h1>
+
+<section>
+  <h2>当前可供数的日档</h2>
+  {% if current %}
+  <table>
+    <thead><tr><th>机组</th><th>UTC 日</th><th>事件数</th><th>发布时刻</th></tr></thead>
+    <tbody>
+    {% for p in current %}
+      <tr>
+        <td><a href="/days/{{ p.unit }}/{{ p.day }}">{{ p.unit }}</a></td>
+        <td>{{ p.day }}</td>
+        <td>{{ p.event_count }}</td>
+        <td>{{ p.created_at }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">暂无现行日档。</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>按日状态</h2>
+  {% if days %}
+  <table>
+    <thead>
+      <tr><th>机组</th><th>UTC 日</th><th>当前事件修订</th><th>缺映射</th><th>现行资格</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for d in days %}
+      <tr class="{{ 'row-bad' if d.missing else '' }}">
+        <td><a href="/days/{{ d.unit }}/{{ d.day }}">{{ d.unit }}</a></td>
+        <td>{{ d.day }}</td>
+        <td>{{ d.events | length }}</td>
+        <td>{{ d.missing | length }}</td>
+        <td>
+          {% if d.publish %}<span class="pill ok">现行</span>
+          {% elif d.missing %}<span class="pill bad">缺映射 · 整日不可供数</span>
+          {% else %}<span class="pill warn">未发布</span>{% endif %}
+        </td>
+        <td><a href="/days/{{ d.unit }}/{{ d.day }}">查看 / 重算</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">还没有事件。</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>最近事件修订</h2>
+  <table>
+    <thead><tr><th>事件号</th><th>修订</th><th>机组</th><th>固件</th><th>故障码</th><th>UTC 时刻</th></tr></thead>
+    <tbody>
+    {% for e in recent %}
+      <tr>
+        <td>{{ e.event_no }}</td><td>{{ e.revision }}</td><td>{{ e.unit }}</td>
+        <td>{{ e.firmware_version }}</td><td>{{ e.fault_code }}</td><td>{{ e.occurred_at }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

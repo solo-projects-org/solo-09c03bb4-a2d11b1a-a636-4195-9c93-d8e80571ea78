@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}类别映射 · 风电机组故障码类别发布台{% endblock %}
+{% block content %}
+<h1>类别映射</h1>
+<p class="muted">
+  映射以“固件版本 + 故障码”为键，修订号严格递增。同一故障码在不同固件版本下可以代表
+  不同故障，须分别维护。新增修订会撤销受影响日档的现行资格，须重算后才能继续供数。
+</p>
+
+<form method="post" action="/mappings" class="card grid">
+  <label>固件版本
+    <input name="firmware_version" required value="{{ (form or {}).get('firmware_version', '') }}" placeholder="FW-1.4.2">
+  </label>
+  <label>故障码
+    <input name="fault_code" required value="{{ (form or {}).get('fault_code', '') }}" placeholder="E-1042">
+  </label>
+  <label>修订号
+    <input name="revision" type="number" min="1" required value="{{ (form or {}).get('revision', '') }}" placeholder="1">
+  </label>
+  <label>类别
+    <input name="category" required value="{{ (form or {}).get('category', '') }}" placeholder="变桨系统">
+  </label>
+  <div class="actions"><button type="submit">登记映射修订</button></div>
+</form>
+
+<h2>映射修订历史</h2>
+{% if history %}
+<table>
+  <thead><tr><th>固件版本</th><th>故障码</th><th>修订</th><th>类别</th><th>登记时刻</th></tr></thead>
+  <tbody>
+  {% for m in history %}
+    <tr>
+      <td>{{ m.firmware_version }}</td><td>{{ m.fault_code }}</td>
+      <td>{{ m.revision }}</td><td>{{ m.category }}</td>
+      <td class="muted">{{ m.created_at }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">尚无映射。</p>
+{% endif %}
+{% endblock %}

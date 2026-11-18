@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}事件登记 · 风电机组故障码类别发布台{% endblock %}
+{% block content %}
+<h1>事件登记</h1>
+<p class="muted">
+  同一事件号每次更正必须递增修订号（严格 +1，不允许跳号）。登记后，事件原先所在日档与
+  现在所在日档立即失去现行供数资格，须重算发布。
+</p>
+
+<form method="post" action="/events" class="card grid">
+  <label>事件号
+    <input name="event_no" required value="{{ (form or {}).get('event_no', '') }}" placeholder="EVT-0001">
+  </label>
+  <label>修订号
+    <input name="revision" type="number" min="1" required value="{{ (form or {}).get('revision', '') }}" placeholder="1">
+  </label>
+  <label>机组
+    <input name="unit" required value="{{ (form or {}).get('unit', '') }}" placeholder="WTG-01">
+  </label>
+  <label>固件版本
+    <input name="firmware_version" required value="{{ (form or {}).get('firmware_version', '') }}" placeholder="FW-1.4.2">
+  </label>
+  <label>故障码
+    <input name="fault_code" required value="{{ (form or {}).get('fault_code', '') }}" placeholder="E-1042">
+  </label>
+  <label>UTC 时刻
+    <input name="occurred_at" required value="{{ (form or {}).get('occurred_at', '') }}" placeholder="2026-01-01T08:30:00Z">
+  </label>
+  <div class="actions"><button type="submit">登记 / 更正</button></div>
+</form>
+
+<h2>事件修订历史</h2>
+{% if history %}
+<table>
+  <thead><tr><th>事件号</th><th>修订</th><th>机组</th><th>固件</th><th>故障码</th><th>UTC 时刻</th><th>登记时刻</th></tr></thead>
+  <tbody>
+  {% for e in history %}
+    <tr>
+      <td>{{ e.event_no }}</td><td>{{ e.revision }}</td><td>{{ e.unit }}</td>
+      <td>{{ e.firmware_version }}</td><td>{{ e.fault_code }}</td>
+      <td>{{ e.occurred_at }}</td><td class="muted">{{ e.revision_created_at }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">尚无事件。</p>
+{% endif %}
+{% endblock %}

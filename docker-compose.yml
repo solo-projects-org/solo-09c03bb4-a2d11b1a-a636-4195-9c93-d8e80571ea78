@@ -1,0 +1,20 @@
+services:
+  ops:
+    build: .
+    image: turbine-fault-ops:local
+    ports:
+      - "8000:8000"
+    environment:
+      FAULT_DB: /data/ops.db
+    volumes:
+      - ops-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  ops-data:

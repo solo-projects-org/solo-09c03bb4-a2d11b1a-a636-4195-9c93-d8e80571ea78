@@ -1,0 +1,30 @@
+{% macro msg_banner(msg, ok) %}
+  {% if msg %}
+    <div class="banner {{ 'ok' if ok else 'bad' }}">{{ msg }}</div>
+  {% endif %}
+{% endmacro %}
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}风电机组故障码类别发布台{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <a class="brand" href="/">风电机组故障码类别发布台</a>
+  <nav>
+    <a href="/">概览</a>
+    <a href="/events">事件登记</a>
+    <a href="/mappings">类别映射</a>
+    <a href="/api/days">供数 API</a>
+  </nav>
+</header>
+<main>
+  {{ msg_banner(msg, ok) }}
+  {% block content %}{% endblock %}
+</main>
+<footer>分析组统一按“机组 + UTC 日”取数；类别由固件版本与故障码的映射修订决定。</footer>
+</body>
+</html>

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}{{ view.unit }} · {{ view.day }}{% endblock %}
+{% block content %}
+<h1>{{ view.unit }} · {{ view.day }}（UTC）</h1>
+
+{% if view.publish %}
+  <div class="banner ok">
+    现行日档 #{{ view.publish.id }}，发布于 {{ view.publish.created_at }}，
+    事件修订集合 <code>{{ view.publish.event_revisions }}</code>，发布依据 <code>{{ view.publish.recipe }}</code>。
+  </div>
+{% elif view.missing %}
+  <div class="banner bad">缺少类别映射，整日不能供数。</div>
+{% elif view.revoked %}
+  <div class="banner warn">
+    现行资格已撤销（{{ view.revoked[0].revoked_reason }}），须以同一组现行修订重新发布。
+  </div>
+{% else %}
+  <div class="banner warn">该日尚未发布。</div>
+{% endif %}
+
+<h2>当前事件修订（{{ view.events | length }}）</h2>
+{% if view.events %}
+<table>
+  <thead><tr><th>事件号</th><th>修订</th><th>固件</th><th>故障码</th><th>UTC 时刻</th><th>映射类别</th></tr></thead>
+  <tbody>
+  {% for e in view.events %}
+    <tr class="{{ 'row-bad' if e.event_no in view.missing_ids else '' }}">
+      <td>{{ e.event_no }}</td><td>{{ e.revision }}</td>
+      <td>{{ e.firmware_version }}</td><td>{{ e.fault_code }}</td>
+      <td>{{ e.occurred_at }}</td>
+      <td>
+        {% if e.event_no in view.missing_ids %}
+          <span class="pill bad">缺少映射</span>
+        {% else %}
+          {{ view.categories.get(e.event_no, '') }}
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="muted">该日没有事件。</p>
+{% endif %}
+
+{% if view.missing %}
+<h2>缺少映射的事件</h2>
+<ul class="missing">
+  {% for e in view.missing %}
+  <li>{{ e.event_no }}（修订 {{ e.revision }}）：{{ e.firmware_version }} / {{ e.fault_code }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<h2>重算发布</h2>
+<form method="post" action="/days/{{ view.unit }}/{{ view.day }}/publish" class="card">
+  <input type="hidden" name="revision_set" value="{{ revision_set }}">
+  <input type="hidden" name="recipe" value="{{ recipe }}">
+  <p>
+    重算将使用以下事件修订：<code>{{ revision_set }}</code>，映射依据：<code>{{ recipe }}</code>。
+    若期间又有事件更正或映射修订，发布会被拒绝，而不会输出不一致的日档。
+  </p>
+  <div class="actions">
+    <button type="submit" {{ 'disabled' if view.missing or not view.events else '' }}>按现行修订重算并发布</button>
+  </div>
+</form>
+
+{% if view.publish %}
+<h2>现行日档内容</h2>
+<table>
+  <thead><tr><th>事件号</th><th>修订</th><th>故障码</th><th>类别</th><th>UTC 时刻</th><th>映射修订</th></tr></thead>
+  <tbody>
+  {% for i in items %}
+    <tr>
+      <td>{{ i.event_no }}</td><td>{{ i.revision }}</td><td>{{ i.fault_code }}</td>
+      <td>{{ i.category }}</td><td>{{ i.occurred_at }}</td><td>{{ i.map_revision }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<form method="post" action="/days/{{ view.unit }}/{{ view.day }}/revoke" class="inline">
+  <button class="secondary" type="submit">撤销现行资格</button>
+</form>
+{% endif %}
+
+{% if view.revoked %}
+<h2>历史（已撤销）日档</h2>
+<table>
+  <thead><tr><th>#</th><th>事件修订集合</th><th>发布时刻</th><th>撤销时刻</th><th>撤销原因</th></tr></thead>
+  <tbody>
+  {% for p in view.revoked %}
+    <tr>
+      <td>{{ p.id }}</td><td><code>{{ p.event_revisions }}</code></td>
+      <td class="muted">{{ p.created_at }}</td><td class="muted">{{ p.revoked_at }}</td>
+      <td>{{ p.revoked_reason }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}
