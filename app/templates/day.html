@@ -7,6 +7,9 @@
   <div class="banner ok">
     现行日档 #{{ view.publish.id }}，发布于 {{ view.publish.created_at }}，
     事件修订集合 <code>{{ view.publish.event_revisions }}</code>，发布依据 <code>{{ view.publish.recipe }}</code>。
+    <div class="actions">
+      <a class="button" href="/api/days/{{ view.unit }}/{{ view.day }}/export.csv">下载 CSV</a>
+    </div>
   </div>
 {% elif view.missing %}
   <div class="banner bad">缺少类别映射，整日不能供数。</div>

@@ -45,8 +45,36 @@ pytest
 | --- | --- |
 | `GET /api/days` | 当前可用的日档列表 |
 | `GET /api/days/{unit}/{day}` | 现行日档内容；不可用时返回 `409` 和原因 |
-| `GET /api/days/{unit}/{day}/export.csv` | 同内容 CSV 下载 |
+| `GET /api/days/{unit}/{day}/export.csv` | 同内容 CSV 下载（流式，见下） |
 | `GET /healthz` | 存活检查（Compose healthcheck 使用） |
+
+现行日档页（`/days/{unit}/{day}`）在现行日档提示条里直接提供「下载 CSV」入口。
+
+### CSV 下载的流式语义
+
+`export.csv` 不再把整日事件与全部发布明细读进内存再拼成一个字符串：
+
+- 请求开始时只解析一次 `(unit, day)` 的 `CURRENT` 发布，记下 `publish_id` 与
+  `recipe`，随即关闭该连接；不做 `day_view`（那会读入整日事件）。
+- 明细按 `(occurred_at, event_no, id)` 键集分页读取，每批最多
+  `FAULT_CSV_BATCH_SIZE`（默认 500）行，每批都用一个**短命连接**：读完即关，
+  两次读取之间不持有 SQLite 读事务，也不产生磁盘暂存文件。
+- 编码后的文本按行写入缓冲，达到 `FAULT_CSV_CHUNK_BYTES`（默认 64 KiB）即
+  flush 成一块发走；因此峰值内存 ≈ 一行 + 一块，与日档行数无关。
+- `publishes` / `publish_items` 只追加不修改：下载开始后即使事件更正、映射修订或
+  重发布，未中断的客户端仍收到**它开始时那份发布**的完整明细（旧类别、旧修订、
+  旧 `publish_id` 与 `recipe`）；变更后的新请求则按最新供数资格返回文件或 `409`。
+- 客户端断开时 Starlette 取消生成器，后续批次不再读取；已读批次的连接早已关闭，
+  不占 WAL 读快照，也不留暂存资源。
+
+列与顺序保持不变：`unit, utc_day, event_no, revision, firmware_version,
+fault_code, category, occurred_at, mapping_revision, publish_id, recipe`。
+`recipe` 在每行重复该发布的事件修订 + 映射修订快照；大日档下单行可达数百 KB，
+这正是峰值内存必须按「一行」而不是「一批」限定的原因。
+
+> 注意：`/api/days/{unit}/{day}`（JSON）仍会把该发布明细整体物化返回；大日档请用
+> CSV 接口。日档页本身也会渲染整日事件表，面向运维核对，不面向批量取数。
+
 
 ## 规则与实现对应
 
@@ -81,7 +109,10 @@ pytest
 
 ## 已知限制
 
-- 无身份认证与权限区分：假定部署在内网、由受信运维人员使用。
+- 无身份认证与权限区分：假定部署在内网、受信运维人员使用。
 - 没有删除事件/映射的功能（更正靠新增修订实现），也没有分页；数据量按单站日档规模设计。
+- `/api/days/{unit}/{day}`（JSON）与日档页仍会载入整日明细；只有 CSV 导出是流式的。
+- CSV 每行重复完整 `recipe`，大日档文件会很大（3 万事件约 11 GB）。列与内容按需求
+  保持不变；如需瘦身可另议是否把 `recipe` 改为每文件一次或省略。
 - 单进程 SQLite（WAL）写入串行化；`uvicorn` 以单 worker 运行。大规模并发需要换
   PostgreSQL 之类的存储。

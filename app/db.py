@@ -87,6 +87,11 @@ CREATE TABLE IF NOT EXISTS publish_items (
 CREATE INDEX IF NOT EXISTS idx_publish_items_publish
     ON publish_items (publish_id);
 
+-- Key-set pagination for the streaming CSV export: each batch seeks straight to
+-- the row after the previous batch instead of re-scanning all items of a publish.
+CREATE INDEX IF NOT EXISTS idx_publish_items_stream
+    ON publish_items (publish_id, occurred_at, event_no, id);
+
 CREATE TABLE IF NOT EXISTS operation_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     at          TEXT    NOT NULL,

@@ -494,6 +494,93 @@ def publish_items(conn: sqlite3.Connection, publish_id: int) -> list[sqlite3.Row
     ).fetchall()
 
 
+def publish_item_batch(
+    conn: sqlite3.Connection,
+    publish_id: int,
+    after: tuple[str, str, int] | None,
+    limit: int,
+) -> list[sqlite3.Row]:
+    """One keyset-paginated slice of a publish's items.
+
+    Used by the CSV export so a download never has to materialise every row: the
+    caller fetches ``limit`` rows at a time, seeks after the last one, and closes
+    the connection between batches.  ``publish_items`` is append-only, so rows of
+    a given publish never change and separate read transactions still compose a
+    complete, consistent file.
+
+    The order (``occurred_at, event_no, id``) is the export's established order;
+    ``event_no`` is unique within one publish, and ``id`` only breaks ties that
+    cannot occur in practice, keeping the keyset strictly monotonic.
+    """
+    if after is None:
+        return conn.execute(
+            "SELECT * FROM publish_items WHERE publish_id = ?"
+            " ORDER BY occurred_at, event_no, id LIMIT ?",
+            (publish_id, limit),
+        ).fetchall()
+    occurred_at, event_no, row_id = after
+    return conn.execute(
+        "SELECT * FROM publish_items WHERE publish_id = ?"
+        " AND (occurred_at > ?"
+        "      OR (occurred_at = ?"
+        "          AND (event_no > ? OR (event_no = ? AND id > ?))))"
+        " ORDER BY occurred_at, event_no, id LIMIT ?",
+        (publish_id, occurred_at, occurred_at, event_no, event_no, row_id, limit),
+    ).fetchall()
+
+
+def current_publish(
+    conn: sqlite3.Connection, unit: str, day: str
+) -> sqlite3.Row | None:
+    """The CURRENT publish for one (unit, day), fetched without loading its items."""
+    return conn.execute(
+        "SELECT * FROM publishes WHERE unit = ? AND day = ? AND status = 'CURRENT'",
+        (unit, day),
+    ).fetchone()
+
+
+def _day_has_unmapped_event(
+    conn: sqlite3.Connection, unit: str, day: str
+) -> bool:
+    return (
+        conn.execute(
+            "SELECT 1 FROM events e"
+            " JOIN (SELECT event_no, MAX(revision) AS r FROM events GROUP BY event_no) m"
+            "   ON m.event_no = e.event_no AND m.r = e.revision"
+            " WHERE e.unit = ? AND substr(e.occurred_at, 1, 10) = ?"
+            "   AND NOT EXISTS ("
+            "     SELECT 1 FROM mappings mp"
+            "     WHERE mp.firmware_version = e.firmware_version"
+            "       AND mp.fault_code = e.fault_code"
+            "   ) LIMIT 1",
+            (unit, day),
+        ).fetchone()
+        is not None
+    )
+
+
+def unavailable_reasons(
+    conn: sqlite3.Connection, unit: str, day: str
+) -> list[str]:
+    """Why a day has no downloadable file, without building the full day view.
+
+    The download path must stay bounded in memory even for a day with tens of
+    thousands of events, so this asks SQLite for existence rather than fetching
+    the event set.  The wording matches the JSON/CSV endpoints.
+    """
+    reasons: list[str] = []
+    if _day_has_unmapped_event(conn, unit, day):
+        reasons.append("缺少类别映射")
+    revoked = conn.execute(
+        "SELECT 1 FROM publishes WHERE unit = ? AND day = ? AND status = 'REVOKED'"
+        " LIMIT 1",
+        (unit, day),
+    ).fetchone()
+    if revoked is not None:
+        reasons.append("现行资格已撤销，等待重算发布")
+    return reasons or ["该日没有现行日档"]
+
+
 def all_publishes(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT * FROM publishes ORDER BY created_at DESC, id DESC"

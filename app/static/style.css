@@ -46,6 +46,11 @@ button {
   background: #1559b3; color: #fff; cursor: pointer;
 }
 button:hover { background: #10448a; }
+a.button {
+  display: inline-block; margin-top: 10px; padding: 7px 12px; border-radius: 6px;
+  background: #1559b3; color: #fff; text-decoration: none; font-size: 14px;
+}
+a.button:hover { background: #10448a; }
 button:disabled { background: #a9b6c6; cursor: not-allowed; }
 button.secondary { background: #5b6b80; }
 button.secondary:hover { background: #465466; }
